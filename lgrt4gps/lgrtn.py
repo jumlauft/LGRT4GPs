@@ -7,7 +7,7 @@ import copy
 
 class LGRTN(BTN):
     """
-    Locally Growing Random Tree Node
+    Locally Growing Random Tree Node inherits from BTN
 
     .. versionadded:: 0.0.1
 

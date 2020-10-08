@@ -8,13 +8,15 @@ Welcome to lgrt4gps's documentation!
 .. toctree::
    :maxdepth: 2
 
+
+Locally Growing Random Tree Node
+================================
+.. automodule:: lgrt4gps.lgrtn
+   :members:
+
 Binary Tree Node
 =====================
 .. automodule:: lgrt4gps.btn
    :members:
 
 
-Locally Growing Random Tree Node
-================================
-.. automodule:: lgrt4gps.lgrtn
-   :members:
