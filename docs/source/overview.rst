@@ -3,7 +3,7 @@ Overview
 
 A minimal working example
 
-.. testcode::
+.. code-block:: python
     
     >>> import numpy as np
     >>> from lgrt4gps.lgrtn import LGRTN
