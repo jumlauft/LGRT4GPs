@@ -1,22 +1,42 @@
-.. lgrt4gps documentation master file, created by
-   sphinx-quickstart on Thu Oct  8 09:01:39 2020.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+Locally Growing Random Trees for Gaussian Processes
+---------------------------------------------------
 
-Welcome to lgrt4gps's documentation!
-====================================
+Welcome to the documentation for **lgrt4gps**!
+
+**lgrt4gps** is a Python library which provides a simple API for 
+locally growing ranodm trees for Gaussian processes
+For more details we refer to the publication on ArXiv_.
+
+Requirements
+============
+
+- Python 3.7+
+
+Installation
+============
+
+To install a stable version from PyPi_:
+
+.. code-block:: bash
+
+    ~$ pip install binarytree
+
+The latest version is available on GitHub_:
+
+
+
+.. _PyPi: https://github.com/jumlauft/LGRT4GPs
+.. _GitHub: https://github.com/jumlauft/LGRT4GPs
+.. _ArXiv: https://arxiv.org/abs/2006.09446
+
+Contents
+========
+
 .. toctree::
-   :maxdepth: 2
+    :maxdepth: 1
 
+    overview
+    specs
 
-Locally Growing Random Tree Node
-================================
-.. automodule:: lgrt4gps.lgrtn
-   :members:
-
-Binary Tree Node
-=====================
-.. automodule:: lgrt4gps.btn
-   :members:
 
 
