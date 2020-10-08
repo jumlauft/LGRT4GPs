@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.stats import norm
 import matplotlib.pyplot as plt
-from src.lgrtn import LGRTN
+from lgrt4gps.lgrtn import LGRTN
 import GPy
 from time import time
 

@@ -9,7 +9,7 @@ README = (HERE / "README.md").read_text()
 
 # This call to setup() does all the work
 setup(
-    name="LGRT4GPs",
+    name="lgrt4gps",
     version="1.0.0",
     description="Locally growing random trees for Gaussian processes",
     long_description=README,
