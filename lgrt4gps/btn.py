@@ -71,7 +71,7 @@ class BTN:
             raise TypeError('node must be a BTN instance')
         else:
             self._rightChild = node
-            node.set_parent(self)
+            node.parent = self
 
     @leftChild.setter
     def leftChild(self, node):
@@ -89,7 +89,7 @@ class BTN:
             raise TypeError('node must be a BTN instance')
         else:
             self._leftChild = node
-            node.set_parent(self)
+            node.parent = self
     @property
     def parent(self):
         """
@@ -104,7 +104,7 @@ class BTN:
     @parent.setter
     def parent(self,node):
         """
-        Set parent for current node
+        Parent for current node
 
         Parameters
         ----------

@@ -5,4 +5,4 @@ gpy~=1.9.9
 six~=1.15.0
 setuptools~=50.3.0
 matplotlib~=3.3.2
-sphinx~=3.2.1
+tqdm~=4.50.2
