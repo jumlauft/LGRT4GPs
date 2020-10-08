@@ -19,7 +19,7 @@ To install a stable version from PyPi_:
 
 .. code-block:: bash
 
-    ~$ pip install binarytree
+    ~$ pip install lgrt4gps
 
 The latest version is available on GitHub_:
 
