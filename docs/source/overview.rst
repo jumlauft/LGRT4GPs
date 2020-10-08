@@ -21,7 +21,7 @@ A minimal working example
     >>> mu_lgrt_gp, s2_lgrt_gp = lgrt_gp.predict(xte)
     >>> mse = np.mean((mu_lgrt_gp - yte) ** 2)
     >>> print(lgrt_gp)
-    
+
                       _____________________________x_0<0.500304____________________________
                  /                                                                     \
          __x_0<0.749385__________                                       ___________x_0<0.252210__________
@@ -30,6 +30,5 @@ A minimal working example
                           /               \                   /               \                   /               \
                         N=62              N=78              N=67              N=64              N=61              N=73
       
-      >>> print(mse)
-      0.0008375186565166093
-    
+    >>> print(mse)
+    0.0008375186565166093    
