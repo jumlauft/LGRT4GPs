@@ -38,7 +38,7 @@ def test_sarcos():
     results = []
     #lgrt_gp.add_data(xtr[-40000:,:], ytr[-40000:,:])
     ntr = xtr.shape[0]
-    for i in trange(100,ntr,100):
+    for i in trange(10000,ntr,10000):
         t0 = timer()
         lgrt_gp = LGRTN(dx, dy)
         t1 = timer()

@@ -1,6 +1,5 @@
 import numpy as np
 import warnings
-# from binarytree import Node as BTN
 from lgrt4gps.gp import Kernel, GP
 # from GPy.models import GPRegression as GP
 # from GPy.kern import RBF as Kernel
@@ -154,9 +153,11 @@ class LGRTN(BTN):
 
         # create empty child GPs
         self.left = LGRTN(self.dx, self.dy, **self.opt,
-                               kernels=self.kernels) # copy.deepcopy(self.kernels)
+                          kernels=copy.deepcopy(self.kernels))
+                          # kernels=self.kernels)
         self.right = LGRTN(self.dx, self.dy, **self.opt,
-                                kernels=self.kernels)
+                           kernels=copy.deepcopy(self.kernels))
+                            # kernels=self.kernels)
 
         # Pass data
         self._distribute_data(X, Y)
