@@ -42,7 +42,7 @@ def test_1D():
     NLL_fullGP = -np.sum(norm.logpdf(yte,loc=mu_fullGP, scale=np.sqrt(s2_fullGP)))
     print('fullGP: MSE: {:f}'.format(MSE_fullGP) + ', NLL: {:f}'.format(NLL_fullGP))
 
-    beta = 0.2
+    beta = 2
     plt.figure()
     plt.scatter(xtr, ytr)
     plt.plot(xte, mu_LGRT_GP,'r')

@@ -38,7 +38,7 @@ class BTN:
 
         Returns
         -------
-        _leftChild : BTN
+        leftChild : BTN
             left child of current node
         """
         return self._leftChild
@@ -50,7 +50,7 @@ class BTN:
 
         Returns
         -------
-        _rightchild : BTN
+        rightchild : BTN
             right child of current node
         """
         return self._rightChild
@@ -125,7 +125,7 @@ class BTN:
         -------
         is_leaf : bool
         """
-        return self._rightChild is None and self._leftChild is None
+        return self.rightChild is None and self.leftChild is None
 
     @property
     def is_root(self):
@@ -136,7 +136,7 @@ class BTN:
         -------
         is_root : bool
         """
-        return self._parent is None
+        return self.parent is None
 
     def get_root(self):
         """
@@ -149,7 +149,7 @@ class BTN:
         """
         root = self
         while not root.is_root:
-            root = root.get_parent()
+            root = root.parent
         return root
 
     @property
@@ -161,8 +161,8 @@ class BTN:
         -------
         depth : int
         """
-        left_depth = self._leftChild.depth if self._leftChild else 0
-        right_depth = self._rightChild.depth if self._rightChild  else 0
+        left_depth = self.leftChild.depth if self.leftChild else 0
+        right_depth = self.rightChild.depth if self.rightChild  else 0
         return max(left_depth, right_depth) + 1
 
     def __str__(self):
@@ -185,13 +185,13 @@ class BTN:
         -------
         number_of_leaves : int
         """
-        if self._leftChild is None and self._rightChild is None:
+        if self.leftChild is None and self.rightChild is None:
             return 1
         count = 0
-        if self._leftChild:
-            count += self._leftChild.width()
-        if self._rightChild:
-            count += self._rightChild.width()
+        if self.leftChild:
+            count += self.leftChild.num_leaves
+        if self.rightChild:
+            count += self.rightChild.num_leaves
         return count
 
     def __len__(self):
@@ -249,9 +249,9 @@ def build_tree_string(node, curr_index, index=False, delimiter='-'):
 
     # Get the left and right sub-boxes, their widths, and root repr positions
     l_box, l_box_width, l_root_start, l_root_end = \
-        build_tree_string(node._leftChild,2 * curr_index + 1, index, delimiter)
+        build_tree_string(node.leftChild,2 * curr_index + 1, index, delimiter)
     r_box, r_box_width, r_root_start, r_root_end = \
-        build_tree_string(node._rightChild,2 * curr_index + 2, index, delimiter)
+        build_tree_string(node.rightChild,2 * curr_index + 2, index, delimiter)
 
     # Draw the branch connecting the current root node to the left sub-box
     # Pad the line with whitespaces where necessary

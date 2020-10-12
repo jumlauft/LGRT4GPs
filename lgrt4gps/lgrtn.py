@@ -1,6 +1,7 @@
 import numpy as np
 import warnings
 import GPy
+from lgrt4gps.gp import Kernel, GP
 from lgrt4gps.btn import BTN
 import copy
 
@@ -71,7 +72,7 @@ class LGRTN(BTN):
 
         if len(kernels) == 0:
             self.kernels = tuple(
-                [GPy.kern.RBF(input_dim=dx) for _ in range(dy)])
+                [Kernel(input_dim=dx) for _ in range(dy)])
         else:
             self.kernels = tuple(kernels)
 
@@ -150,9 +151,9 @@ class LGRTN(BTN):
 
         # create empty child GPs
         self.leftChild = LGRTN(self.dx, self.dy, **self.opt,
-                               kernels=tuple(copy.deepcopy(self.kernels)))
+                               kernels=self.kernels) # tuple(copy.deepcopy(self.kernels))
         self.rightChild = LGRTN(self.dx, self.dy, **self.opt,
-                                kernels=tuple(copy.deepcopy(self.kernels)))
+                                kernels=self.kernels)
 
         # Pass data
         self._distribute_data(X, Y)
@@ -319,11 +320,12 @@ class LGRTN(BTN):
         """
         self.gps = []
         for dy in range(self.dy):
-            gp = GPy.models.GPRegression(self.X, self.Y[:, dy:dy + 1],
+            gp = GP(self.X, self.Y[:, dy:dy + 1],
                                          self.kernels[dy])
             if self.opt['optimize_hyps']:
                 gp.optimize(messages=False)
             self.gps.append(gp)
+
 
     def _compute_mus2(self, xt):
         """
@@ -348,3 +350,21 @@ class LGRTN(BTN):
             mu, s2 = self.gps[dy].predict(xt)
             mus.append(mu), s2s.append(s2)
         return np.concatenate(mus, axis=1), np.concatenate(s2s, axis=1)
+
+    @property
+    def ndata(self):
+        """
+        Recursively visits leaves and counts total number of data points
+
+        Returns
+        -------
+        ndata : int
+        """
+        if self.leftChild is None and self.rightChild is None:
+            return self.X.shape[0]
+        count = 0
+        if self.leftChild:
+            count += self.leftChild.ndata
+        if self.rightChild:
+            count += self.rightChild.ndata
+        return count
