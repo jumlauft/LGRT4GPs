@@ -1,7 +1,9 @@
 import numpy as np
 import warnings
-import GPy
+# from binarytree import Node as BTN
 from lgrt4gps.gp import Kernel, GP
+# from GPy.models import GPRegression as GP
+# from GPy.kern import RBF as Kernel
 from lgrt4gps.btn import BTN
 import copy
 
@@ -101,6 +103,7 @@ class LGRTN(BTN):
         y : numpy array (n x dx)
             output data to be added
         """
+        self.value += x.shape[0]
         if x.size > 0:
             if not self.is_leaf:
                 # if node is not a leaf, distribute data to children
@@ -116,7 +119,7 @@ class LGRTN(BTN):
                 else:
                     self._setup_gps()
                     self._update_gp = False
-                self.str = 'N=' + str(self.X.shape[0])
+                self.val = 'N=' + str(self.X.shape[0])
 
     @property
     def is_full(self):
@@ -150,9 +153,9 @@ class LGRTN(BTN):
         self.div_dim, self.div_val, self.ol = self._get_divider(X)
 
         # create empty child GPs
-        self.leftChild = LGRTN(self.dx, self.dy, **self.opt,
-                               kernels=self.kernels) # tuple(copy.deepcopy(self.kernels))
-        self.rightChild = LGRTN(self.dx, self.dy, **self.opt,
+        self.left = LGRTN(self.dx, self.dy, **self.opt,
+                               kernels=self.kernels) # copy.deepcopy(self.kernels)
+        self.right = LGRTN(self.dx, self.dy, **self.opt,
                                 kernels=self.kernels)
 
         # Pass data
@@ -176,8 +179,8 @@ class LGRTN(BTN):
         iright = np.invert(ileft)
 
         # assign data to children
-        self.leftChild.add_data(x[ileft, :], y[ileft, :])
-        self.rightChild.add_data(x[iright, :], y[iright, :])
+        self.left.add_data(x[ileft, :], y[ileft, :])
+        self.right.add_data(x[iright, :], y[iright, :])
 
     def _prob_left(self, x):
         """
@@ -201,7 +204,7 @@ class LGRTN(BTN):
 
         1. Computes dimension with widest spread
         2. Computes division values 'median', 'mean', or 'center'
-        3. Computes ovelapp regrion
+        3. Computes overlap region
         Parameters
         ----------
         x : numpy array (n x dx)
@@ -236,7 +239,7 @@ class LGRTN(BTN):
             o = 0.1
         else:
             o = (ma[dim] - mi[dim]) / self.opt['wo_ratio']
-        self.str = 'x_' + str(dim) + '<' + '{:f}'.format(val)
+        self.val = 'x_' + str(dim) + '<' + '{:f}'.format(val)
         return dim, val, o
 
     def predict(self, xt):
@@ -259,17 +262,21 @@ class LGRTN(BTN):
             posterior variance
         """
         # Recursively get predictions from all leaves
-        mus, s2s, eta = [], [], []
-        self.predict_local(xt, mus, s2s, eta, np.zeros(xt.shape[0]))
-        mus, s2s = np.stack(mus, axis=2), np.stack(s2s, axis=2)
-        w = np.exp(np.stack(eta, axis=1).reshape(-1, 1, len(eta)))
+        mus, s2s, etas = [], [], []
+        nte = xt.shape[0]
+
+        self.predict_local(xt, mus, s2s, etas, np.zeros(nte))
 
         # Combine predicted values based on inference method
         if self.opt['inf_method'] != 'moe':
             warnings.warn("inference method unknown, used 'moe' as default")
-        mu = np.sum(mus * w, axis=2)
-        s2 = np.sum(w * (s2s + mus ** 2), axis=2) - mu ** 2
-
+        mu, s2 = np.zeros((nte,self.dy)),np.zeros((nte,self.dy))
+        for (m,s,e) in zip(mus,s2s,etas):
+            idx = np.invert(np.isinf(e))
+            w = np.exp(e[idx].reshape(-1, 1))
+            mu[idx,:] += m*w
+            s2[idx,:] += w * (s + m ** 2)
+        s2 -= mu ** 2
         return mu, s2
 
     def predict_local(self, xt, mu, s2, eta, log_p):
@@ -294,7 +301,8 @@ class LGRTN(BTN):
 
         """
         if self.is_leaf:
-            m, v = self._compute_mus2(xt)
+            idx = np.invert(np.isinf(log_p))
+            m, v = self._compute_mus2(xt[idx,:])
             mu.append(m)
             s2.append(v)
             eta.append(log_p)
@@ -310,9 +318,9 @@ class LGRTN(BTN):
 
             # if nonzero probabilities exist, pass on to children
             if np.any(log_pl > -np.inf):
-                self.leftChild.predict_local(xt, mu, s2, eta, log_pl)
+                self.left.predict_local(xt, mu, s2, eta, log_pl)
             if np.any(log_pr > -np.inf):
-                self.rightChild.predict_local(xt, mu, s2, eta, log_pr)
+                self.right.predict_local(xt, mu, s2, eta, log_pr)
 
     def _setup_gps(self):
         """
@@ -320,8 +328,7 @@ class LGRTN(BTN):
         """
         self.gps = []
         for dy in range(self.dy):
-            gp = GP(self.X, self.Y[:, dy:dy + 1],
-                                         self.kernels[dy])
+            gp = GP(self.X, self.Y[:, dy:dy + 1], self.kernels[dy])
             if self.opt['optimize_hyps']:
                 gp.optimize(messages=False)
             self.gps.append(gp)
@@ -351,20 +358,3 @@ class LGRTN(BTN):
             mus.append(mu), s2s.append(s2)
         return np.concatenate(mus, axis=1), np.concatenate(s2s, axis=1)
 
-    @property
-    def ndata(self):
-        """
-        Recursively visits leaves and counts total number of data points
-
-        Returns
-        -------
-        ndata : int
-        """
-        if self.leftChild is None and self.rightChild is None:
-            return self.X.shape[0]
-        count = 0
-        if self.leftChild:
-            count += self.leftChild.ndata
-        if self.rightChild:
-            count += self.rightChild.ndata
-        return count

@@ -1,14 +1,16 @@
 import numpy as np
-from time import time
+from timeit import default_timer as timer
 import pandas as pd
+import cProfile
+import pstats
 from lgrt4gps.lgrtn import LGRTN
 from scipy.io import loadmat
 from scipy.stats import norm
 
 import urllib.request
 import os
-from tqdm.contrib import tzip
-
+from tqdm import trange
+profile = cProfile.Profile()
 def test_sarcos():
     infile = "sarcos_inv_train.mat"
     if not os.path.exists(infile):
@@ -29,26 +31,34 @@ def test_sarcos():
 
     print("Data successfully loaded")
 
-    lgrt_gp = LGRTN(dx, dy)
-    labels = ['N','t_train', 't_pred', 'tree_depth', 'num_leaves', 'mse','nll']
-    results = [[[]]*len(labels)]
-    i = 0
-    for (x,y) in tzip(xtr,ytr):
-        x, y = x.reshape(1,dx), y.reshape(1,dy)
-        t0 = time()
-        lgrt_gp.add_data(x,y)
-        t_train = time() - t0
-        t0 = time()
+    # lgrt_gp = LGRTN(dx, dy)
+    labels = ['N','t_train', 't_pred','t_add',
+              'tree_height', 'num_leaves',
+              'mse','nll']
+    results = []
+    #lgrt_gp.add_data(xtr[-40000:,:], ytr[-40000:,:])
+    ntr = xtr.shape[0]
+    for i in trange(100,ntr,100):
+        t0 = timer()
+        lgrt_gp = LGRTN(dx, dy)
+        t1 = timer()
+        idx = np.random.choice(ntr, i, replace=False)
+        idx1 = np.random.choice(ntr, 1, replace=False)
+        t2 = timer()
+        lgrt_gp.add_data(xtr[idx,:],ytr[idx,:])
+        t3 = timer()
         mu, s2 = lgrt_gp.predict(xte)
-        t_pred = time() - t0
-        if i % 100 == 0:
-            results.append([lgrt_gp.ndata, t_train, t_pred/xte.shape[0],
-                            lgrt_gp.depth, lgrt_gp.num_leaves ,
+        t4 = timer()
+        lgrt_gp.add_data(xtr[idx1, :], ytr[idx1, :])
+        t5 = timer()
+
+        results.append([i, t3-t2, (t4-t3)/xte.shape[0], t5-t4,
+                            lgrt_gp.height, lgrt_gp.leaf_count ,
                             np.mean((mu - yte) ** 2),
                             -np.sum(norm.logpdf(yte,loc=mu, scale=np.sqrt(s2))) ])
-        i += 1
 
     df = pd.DataFrame(results, columns=labels)
     df.to_csv('results_sarcos.csv')
+
 if __name__ == '__main__':
     test_sarcos()
