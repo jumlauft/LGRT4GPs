@@ -22,4 +22,3 @@ class RBF(Kernel):
         else:
             raise TypeError
 
-print('I was imported')
