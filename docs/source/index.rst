@@ -10,7 +10,7 @@ For more details we refer to the publication on ArXiv_.
 Requirements
 ============
 
-- Python 3.7+
+- Python 3.6+
 
 Installation
 ============
