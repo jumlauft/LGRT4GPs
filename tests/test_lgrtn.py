@@ -1,6 +1,6 @@
 import numpy as np
 import sys, os
-sys.path.append(os.path.abspath('../'))
+sys.path.append(os.path.abspath('./'))
 from lgrt4gps.lgrtn import LGRTN
 
 def test_init():

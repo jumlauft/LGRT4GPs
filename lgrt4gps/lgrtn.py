@@ -22,10 +22,8 @@ class LGRTN(BTN):
         input training data
     Y : numpy array (n x dy)
         output training data
-    gps : list (length: dy)
-        GP regression objects from GPy.model.GPRegression
-    _update_gp : bool
-        Flag to update the gps after adding new data
+    GP_engine : str
+        Currently support are empty string '' or 'GPy' (uses GPy package)
     div_method : string, optional
         Method to divide a dataset.
         Choices are 'median', 'mean', 'center'
@@ -51,10 +49,10 @@ class LGRTN(BTN):
         self.dx, self.dy = dx, dy
         options = kwargs
         options.setdefault('GP_engine', '')
-        options.setdefault('wo_ratio', 100)
         options.setdefault('div_method', 'center')
-        options.setdefault('inf_method', 'moe')
+        options.setdefault('wo_ratio', 100)
         options.setdefault('max_pts', 100)
+        options.setdefault('inf_method', 'moe')
         options.setdefault('optimize_hyps', False)
         options.setdefault('lazy_training', False)
         self.opt = options
@@ -150,11 +148,19 @@ class LGRTN(BTN):
         return self.X.shape[0] >= self.opt['max_pts']
 
     def fit(self):
-        if self.is_leaf and self._update_gp == True:
-            self._setup_gps()
-        if self.opt['optimize_hyps']:
-            for gp in self.gps:
-                gp.optimize()
+        """
+        Prepares the model for prediction
+
+        For lazy training it enforces generation of GPs and trains the
+        hyperparameters if needed
+
+        """
+        if self.is_leaf:
+            if self._update_gp == True:
+                self._setup_gps()
+            if self.opt['optimize_hyps']:
+                for gp in self.gps:
+                    gp.optimize()
 
     def _divide(self, x, y):
         """
