@@ -1,15 +1,16 @@
 import numpy as np
 from timeit import default_timer as timer
 import pandas as pd
-import cProfile
-import pstats
-from lgrt4gps.lgrtn import LGRTN
 from scipy.io import loadmat
 from scipy.stats import norm
-
 import urllib.request
+import sys
 import os
+sys.path.append(os.path.abspath('./'))
+from lgrt4gps.lgrtn import LGRTN
+
 from tqdm import trange
+
 profile = cProfile.Profile()
 def test_sarcos():
     infile = "sarcos_inv_train.mat"
@@ -38,7 +39,7 @@ def test_sarcos():
     results = []
     #lgrt_gp.add_data(xtr[-40000:,:], ytr[-40000:,:])
     ntr = xtr.shape[0]
-    for i in trange(10000,ntr,10000):
+    for i in trange(1,ntr,1):
         t0 = timer()
         lgrt_gp = LGRTN(dx, dy)
         t1 = timer()

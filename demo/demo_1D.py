@@ -8,6 +8,7 @@ import GPy
 def test_1D():
     # set input / output dimnesions
     dx, dy = 1, 1
+    
     # number of training /test  points
     ntr, nte = int(500/2), 100
     f = lambda x: np.sin(x[:, :1])
@@ -16,6 +17,7 @@ def test_1D():
     xtr = np.vstack((np.random.uniform(1, 3,size=(ntr, dx)),
                          np.random.uniform(7, 9, size=(ntr, dx))))
     ytr = f(xtr)
+    
     # generate test data
     xte = np.linspace(0, 10, nte).reshape(-1,1)
     yte = f(xte)
