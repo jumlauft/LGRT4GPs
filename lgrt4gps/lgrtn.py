@@ -1,8 +1,5 @@
 import numpy as np
 import warnings
-from lgrt4gps.gp import Kernel, GP
-# from GPy.models import GPRegression as GP
-# from GPy.kern import RBF as Kernel
 from lgrt4gps.btn import BTN
 import copy
 
@@ -29,40 +26,31 @@ class LGRTN(BTN):
         GP regression objects from GPy.model.GPRegression
     _update_gp : bool
         Flag to update the gps after adding new data
-
+    div_method : string, optional
+        Method to divide a dataset.
+        Choices are 'median', 'mean', 'center'
+    wo_ratio : float, optional
+        width/overlap ratio. must be > 1
+    max_pts : int, optional
+        maximum number of points per leaf
+    inf_method : string, optional
+        Method to combine local predictions
+        Choices 'moe' (Mixture of Experts)
+    optimize_hyps : bool
+        Turn hyperparameter optimization on or off
+    lazy_training : bool
+        Wait with training until prediction is called
     """
 
-    def __init__(self, dx, dy, kernels=(), **kwargs):
+    def __init__(self, dx, dy, kerns=(),**kwargs):
         '''
         Locally Growing Random Tree Node
-
-        Parameters
-        ----------
-        dx : int
-            input dimension
-        dy : int
-            output dimension
-        kernels : list (length: dy)
-            list of kernels from GPy.kern
-        div_method : string, optional
-            Method to divide a dataset.
-            Choices are 'median', 'mean', 'center'
-        wo_ratio : float, optional
-            width/overlap ratio. must be > 1
-        max_pts : int, optional
-            maximum number of points per leaf
-        inf_method : string, optional
-            Method to combine local predictions
-            Choices 'moe' (Mixture of Experts)
-        optimize_hyps : bool
-            Turn hyperparameter optimization on or off
-        lazy_training : bool
-            Wait with training until prediction is called
 
         '''
         super().__init__()
         self.dx, self.dy = dx, dy
         options = kwargs
+        options.setdefault('GP_engine', '')
         options.setdefault('wo_ratio', 100)
         options.setdefault('div_method', 'center')
         options.setdefault('inf_method', 'moe')
@@ -71,13 +59,34 @@ class LGRTN(BTN):
         options.setdefault('lazy_training', False)
         self.opt = options
 
-        if len(kernels) == 0:
-            self.kernels = tuple(
-                [Kernel(input_dim=dx) for _ in range(dy)])
+        # Load correct GP engine and corresponding kernel classes
+        if self.opt['GP_engine'] == '':
+            from lgrt4gps.gp import GP
+            self._gp_class = GP
+            from lgrt4gps.kern import RBF
+            self._kernel_class = RBF
+        elif self.opt['GP_engine'] == 'GPy':
+            from GPy.models import GPRegression
+            self._gp_class = GPRegression
+            from GPy.kern import RBF
+            self._kernel_class = RBF
         else:
-            self.kernels = tuple(kernels)
+            raise NotImplementedError
 
-        # Dimension along which a data set is split
+        # Generate default kernels or check provided kernels
+        if len(kerns) == 0:
+            self._kernels = tuple(
+                [self._kernel_class(input_dim=dx) for _ in range(dy)])
+        else:
+            assert self.dy == len(kerns)
+            self._kernels = tuple(kerns)
+            for k in self._kernels:
+                if not isinstance(k,self._kernel_class):
+                    raise TypeError
+                if k.input_dim != self.dx:
+                    raise ValueError
+
+
         # Training data
         self.X = np.empty((0, self.dx))
         self.Y = np.empty((0, self.dy))
@@ -85,6 +94,10 @@ class LGRTN(BTN):
         # GP model
         self.gps = []
         self._update_gp = True
+
+    @property
+    def kernels(self):
+        return self._kernels
 
     def add_data(self, x, y):
         """
@@ -102,6 +115,12 @@ class LGRTN(BTN):
         y : numpy array (n x dx)
             output data to be added
         """
+        assert x.ndim == 2
+        assert y.ndim == 2
+        assert x.shape[1] == self.dx
+        assert y.shape[1] == self.dy
+        assert x.shape[0] == y.shape[0]
+
         self.value += x.shape[0]
         if x.size > 0:
             if not self.is_leaf:
@@ -117,7 +136,6 @@ class LGRTN(BTN):
                     self._update_gp = True
                 else:
                     self._setup_gps()
-                    self._update_gp = False
                 self.val = 'N=' + str(self.X.shape[0])
 
     @property
@@ -130,6 +148,13 @@ class LGRTN(BTN):
         is_full : bool
         """
         return self.X.shape[0] >= self.opt['max_pts']
+
+    def fit(self):
+        if self.is_leaf and self._update_gp == True:
+            self._setup_gps()
+        if self.opt['optimize_hyps']:
+            for gp in self.gps:
+                gp.optimize()
 
     def _divide(self, x, y):
         """
@@ -153,10 +178,10 @@ class LGRTN(BTN):
 
         # create empty child GPs
         self.left = LGRTN(self.dx, self.dy, **self.opt,
-                          kernels=copy.deepcopy(self.kernels))
+                          kerns=copy.deepcopy(self.kernels))
                           # kernels=self.kernels)
         self.right = LGRTN(self.dx, self.dy, **self.opt,
-                           kernels=copy.deepcopy(self.kernels))
+                           kerns=copy.deepcopy(self.kernels))
                             # kernels=self.kernels)
 
         # Pass data
@@ -164,7 +189,7 @@ class LGRTN(BTN):
 
         # empty parent GP
         self.X, self.Y = np.empty((0, self.dx)), np.empty((0, self.dy))
-        self.gps, self.kernels = [], []
+        self.gps, self._kernels = [], []
 
     def _distribute_data(self, x, y):
         """
@@ -262,6 +287,9 @@ class LGRTN(BTN):
         s2 : numpy array (n x dy)
             posterior variance
         """
+        assert xt.ndim == 2
+        assert xt.shape[1] == self.dx
+
         # Recursively get predictions from all leaves
         mus, s2s, etas = [], [], []
         nte = xt.shape[0]
@@ -329,11 +357,11 @@ class LGRTN(BTN):
         """
         self.gps = []
         for dy in range(self.dy):
-            gp = GP(self.X, self.Y[:, dy:dy + 1], self.kernels[dy])
+            gp = self._gp_class(self.X, self.Y[:, dy:dy + 1], self.kernels[dy])
             if self.opt['optimize_hyps']:
                 gp.optimize(messages=False)
             self.gps.append(gp)
-
+        self._update_gp = False
 
     def _compute_mus2(self, xt):
         """
