@@ -4,8 +4,8 @@ Locally Growing Random Trees for Gaussian Processes
 Welcome to the documentation for **lgrt4gps**!
 
 **lgrt4gps** is a Python library which provides a simple API for 
-locally growing ranodm trees for Gaussian processes
-For more details we refer to the publication on ArXiv_.
+locally growing ranodm trees for Gaussian processes.
+For more details, we refer to the publication on ArXiv_.
 
 Requirements
 ============
@@ -15,9 +15,10 @@ Requirements
 Documentation
 =============
 
-A documentation is availabel on readthedocs_
-The academic publication can be found at ArXiv_
+A documentation is available on readthedocs_.
+The academic publication can be found at ArXiv_.
 A minimal working example is provided as Jupyter Notebook_.
+
 Installation
 ============
 
@@ -36,15 +37,3 @@ The latest version is available on GitHub_:
 .. _ArXiv: https://arxiv.org/abs/2006.09446
 .. _readthedocs: https://lgrt4gps.readthedocs.io/en/latest/
 .. _Notebook: https://github.com/jumlauft/LGRT4GPs/blob/main/demo/demo_1D.ipynb
-
-Contents
-========
-
-.. toctree::
-    :maxdepth: 1
-
-    ../../demo/demo_1D.ipynb
-    specs
-
-
-

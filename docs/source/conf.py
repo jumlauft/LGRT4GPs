@@ -15,14 +15,19 @@ import sys
 sys.path.insert(0, os.path.abspath('../..'))
 sys.setrecursionlimit(1500)
 
+_version = {}
+with open("../../lgrt4gps/version.py") as fp:
+    exec(fp.read(), _version)
+
 # -- Project information -----------------------------------------------------
 
 project = 'lgrt4gps'
 copyright = '2020, Jonas Umlauft'
 author = 'Jonas Umlauft'
 
+version = _version['__version__']
 # The full version, including alpha/beta/rc tags
-release = '0.0.1'
+release =  _version['__version__']
 
 
 # -- General configuration ---------------------------------------------------
@@ -30,7 +35,10 @@ release = '0.0.1'
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
-extensions = ['sphinx.ext.autodoc','numpydoc', 'sphinx.ext.autosummary'
+extensions = ['sphinx.ext.autodoc',
+              'numpydoc',
+              'sphinx.ext.autosummary',
+                'nbsphinx'
 ]
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
