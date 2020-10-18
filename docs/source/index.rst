@@ -44,7 +44,7 @@ Contents
 .. toctree::
     :maxdepth: 1
 
-    demo_1D
+    ../../demo/demo_1D
     specs
 
 
