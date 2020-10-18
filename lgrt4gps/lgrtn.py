@@ -18,12 +18,8 @@ class LGRTN(BTN):
         output dimension
     kernels : list (length: dy)
         list of kernels from GPy.kern
-    X : numpy array (n x dx)
-        input training data
-    Y : numpy array (n x dy)
-        output training data
-    GP_engine : str
-        Currently support are empty string '' or 'GPy' (uses GPy package)
+    GP_engine : str, optional
+        Default is '' for simple high-speed  GP or 'GPy' using the GPy package
     div_method : string, optional
         Method to divide a dataset.
         Choices are 'median', 'mean', 'center'
@@ -38,9 +34,9 @@ class LGRTN(BTN):
         Turn hyperparameter optimization on or off
     lazy_training : bool
         Wait with training until prediction is called
-    """
+     """
 
-    def __init__(self, dx, dy, kerns=(),**kwargs):
+    def __init__(self, dx, dy, kerns=(), **kwargs):
         '''
         Locally Growing Random Tree Node
 
@@ -79,23 +75,78 @@ class LGRTN(BTN):
             assert self.dy == len(kerns)
             self._kernels = tuple(kerns)
             for k in self._kernels:
-                if not isinstance(k,self._kernel_class):
+                if not isinstance(k, self._kernel_class):
                     raise TypeError
                 if k.input_dim != self.dx:
                     raise ValueError
 
-
         # Training data
-        self.X = np.empty((0, self.dx))
-        self.Y = np.empty((0, self.dy))
+        self._X = np.empty((0, self.dx))
+        self._Y = np.empty((0, self.dy))
 
         # GP model
-        self.gps = []
+        self._gps = []
         self._update_gp = True
 
     @property
+    def gps(self):
+        '''
+        list of GP instances (one for each output dimension), read only
+        Returns
+        -------
+        gps : list
+            list of GP instances
+        '''
+        return self._gps
+
+    @gps.setter
+    def gps(self, gps):
+        Exception("the GPs can only be changed at initialization")
+
+    @property
     def kernels(self):
+        '''
+        list of kernel instances (one for each output dimension), read only
+        Returns
+        -------
+        kernels : list
+        '''
         return self._kernels
+
+    @kernels.setter
+    def kernels(self, kerns):
+        Exception("the kernels can only be changed at initialization")
+
+    @property
+    def X(self):
+        '''
+        input training data, read only
+        Returns
+        -------
+        X : numpy array (ntr x dx)
+            input training data
+        '''
+        return self._X
+
+    @X.setter
+    def X(self, x):
+        Exception("X may only be modified by add_data")
+
+    @property
+    def Y(self):
+        '''
+        output training data, read only
+
+        Returns
+        -------
+        Y : numpy array (ntr x dy)
+            output training data
+        '''
+        return self._Y
+
+    @Y.setter
+    def Y(self, y):
+        Exception("Y may only be modified by add_data")
 
     def add_data(self, x, y):
         """
@@ -128,8 +179,8 @@ class LGRTN(BTN):
                 # if node is leaf, but full divide
                 self._divide(x, y)
             else:  # if node is a leaf and not full, add data
-                self.X = np.vstack((self.X, x))  # add to data set
-                self.Y = np.vstack((self.Y, y))
+                self._X = np.vstack((self.X, x))  # add to data set
+                self._Y = np.vstack((self.Y, y))
                 if self.opt['lazy_training']:
                     self._update_gp = True
                 else:
@@ -185,17 +236,17 @@ class LGRTN(BTN):
         # create empty child GPs
         self.left = LGRTN(self.dx, self.dy, **self.opt,
                           kerns=copy.deepcopy(self.kernels))
-                          # kernels=self.kernels)
+        # kernels=self.kernels)
         self.right = LGRTN(self.dx, self.dy, **self.opt,
                            kerns=copy.deepcopy(self.kernels))
-                            # kernels=self.kernels)
+        # kernels=self.kernels)
 
         # Pass data
         self._distribute_data(X, Y)
 
         # empty parent GP
-        self.X, self.Y = np.empty((0, self.dx)), np.empty((0, self.dy))
-        self.gps, self._kernels = [], []
+        self._X, self._Y = np.empty((0, self.dx)), np.empty((0, self.dy))
+        self._gps, self._kernels = [], []
 
     def _distribute_data(self, x, y):
         """
@@ -305,12 +356,12 @@ class LGRTN(BTN):
         # Combine predicted values based on inference method
         if self.opt['inf_method'] != 'moe':
             warnings.warn("inference method unknown, used 'moe' as default")
-        mu, s2 = np.zeros((nte,self.dy)),np.zeros((nte,self.dy))
-        for (m,s,e) in zip(mus,s2s,etas):
+        mu, s2 = np.zeros((nte, self.dy)), np.zeros((nte, self.dy))
+        for (m, s, e) in zip(mus, s2s, etas):
             idx = np.invert(np.isinf(e))
             w = np.exp(e[idx].reshape(-1, 1))
-            mu[idx,:] += m*w
-            s2[idx,:] += w * (s + m ** 2)
+            mu[idx, :] += m * w
+            s2[idx, :] += w * (s + m ** 2)
         s2 -= mu ** 2
         return mu, s2
 
@@ -337,7 +388,7 @@ class LGRTN(BTN):
         """
         if self.is_leaf:
             idx = np.invert(np.isinf(log_p))
-            m, v = self._compute_mus2(xt[idx,:])
+            m, v = self._compute_mus2(xt[idx, :])
             mu.append(m)
             s2.append(v)
             eta.append(log_p)
@@ -361,12 +412,12 @@ class LGRTN(BTN):
         """
             Prepare gp models (one for each output)
         """
-        self.gps = []
+        self._gps = []
         for dy in range(self.dy):
             gp = self._gp_class(self.X, self.Y[:, dy:dy + 1], self.kernels[dy])
             if self.opt['optimize_hyps']:
                 gp.optimize(messages=False)
-            self.gps.append(gp)
+            self._gps.append(gp)
         self._update_gp = False
 
     def _compute_mus2(self, xt):
@@ -392,4 +443,3 @@ class LGRTN(BTN):
             mu, s2 = self.gps[dy].predict(xt)
             mus.append(mu), s2s.append(s2)
         return np.concatenate(mus, axis=1), np.concatenate(s2s, axis=1)
-

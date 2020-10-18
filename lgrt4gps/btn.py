@@ -18,6 +18,7 @@ class BTN(binarytree.Node):
         super().__init__(value=0, left=left, right = right)
         self.parent = parent
         self.str = id(self)
+
     @property
     def parent(self):
         """
