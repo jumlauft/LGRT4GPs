@@ -17,7 +17,6 @@ Documentation
 
 A documentation is available on readthedocs_.
 The academic publication can be found at ArXiv_.
-A minimal working example is provided as Jupyter Notebook_.
 
 Installation
 ============
@@ -36,4 +35,3 @@ The latest version is available on GitHub_:
 .. _GitHub: https://github.com/jumlauft/LGRT4GPs
 .. _ArXiv: https://arxiv.org/abs/2006.09446
 .. _readthedocs: https://lgrt4gps.readthedocs.io/en/latest/
-.. _Notebook: https://github.com/jumlauft/LGRT4GPs/blob/main/demo/demo_1D.ipynb
