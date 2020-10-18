@@ -18,6 +18,7 @@ Documentation
 A documentation is availabel on readthedocs_
 The academic publication can be found at ArXiv_
 A minimal working example is provided as Jupyter Notebook_.
+
 Installation
 ============
 
@@ -43,7 +44,7 @@ Contents
 .. toctree::
     :maxdepth: 1
 
-    ../../demo/demo_1D.ipynb
+    demo_1D.ipynb
     specs
 
 
