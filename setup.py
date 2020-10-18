@@ -1,3 +1,5 @@
+# $ python setup.py sdist bdist_wheel
+# $ twine upload dist/*
 import pathlib
 from setuptools import setup, find_packages
 
