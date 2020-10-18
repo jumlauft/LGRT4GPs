@@ -37,10 +37,10 @@ class LGRTN(BTN):
      """
 
     def __init__(self, dx, dy, kerns=(), **kwargs):
-        '''
+        """
         Locally Growing Random Tree Node
 
-        '''
+        """
         super().__init__()
         self.dx, self.dy = dx, dy
         options = kwargs
@@ -90,13 +90,14 @@ class LGRTN(BTN):
 
     @property
     def gps(self):
-        '''
+        """
         list of GP instances (one for each output dimension), read only
+
         Returns
         -------
         gps : list
             list of GP instances
-        '''
+        """
         return self._gps
 
     @gps.setter
@@ -105,12 +106,13 @@ class LGRTN(BTN):
 
     @property
     def kernels(self):
-        '''
+        """
         list of kernel instances (one for each output dimension), read only
+
         Returns
         -------
         kernels : list
-        '''
+        """
         return self._kernels
 
     @kernels.setter
@@ -119,13 +121,14 @@ class LGRTN(BTN):
 
     @property
     def X(self):
-        '''
+        """
         input training data, read only
+
         Returns
         -------
         X : numpy array (ntr x dx)
             input training data
-        '''
+        """
         return self._X
 
     @X.setter
@@ -134,14 +137,14 @@ class LGRTN(BTN):
 
     @property
     def Y(self):
-        '''
+        """
         output training data, read only
 
         Returns
         -------
         Y : numpy array (ntr x dy)
             output training data
-        '''
+        """
         return self._Y
 
     @Y.setter
