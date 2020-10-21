@@ -15,7 +15,7 @@ class BTN(binarytree.Node):
 
     """
     def __init__(self, left=None, right=None, parent=None):
-        super().__init__(value=0, left=left, right = right)
+        super().__init__(value=0, left=left, right=right)
         self.parent = parent
         self.str = id(self)
 

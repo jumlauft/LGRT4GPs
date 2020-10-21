@@ -2,7 +2,12 @@ import numpy as np
 import warnings
 from lgrt4gps.btn import BTN
 import copy
+import multiprocessing as mp
 
+
+def wrapper(input):
+    fun, args = input
+    return fun(*args)
 
 class LGRTN(BTN):
     """
@@ -36,12 +41,12 @@ class LGRTN(BTN):
         Wait with training until prediction is called
      """
 
-    def __init__(self, dx, dy, kerns=(), **kwargs):
+    def __init__(self, dx, dy, kerns=(), parent=None,**kwargs):
         """
         Locally Growing Random Tree Node
 
         """
-        super().__init__()
+        super().__init__(parent=parent)
         self.dx, self.dy = dx, dy
         options = kwargs
         options.setdefault('GP_engine', '')
@@ -51,6 +56,7 @@ class LGRTN(BTN):
         options.setdefault('inf_method', 'moe')
         options.setdefault('optimize_hyps', False)
         options.setdefault('lazy_training', False)
+        options.setdefault('multi_processing', False)
         self.opt = options
 
         # Load correct GP engine and corresponding kernel classes
@@ -215,6 +221,9 @@ class LGRTN(BTN):
             if self.opt['optimize_hyps']:
                 for gp in self.gps:
                     gp.optimize()
+        else:
+            self.left.fit()
+            self.right.fit()
 
     def _divide(self, x, y):
         """
@@ -237,11 +246,11 @@ class LGRTN(BTN):
         self.div_dim, self.div_val, self.ol = self._get_divider(X)
 
         # create empty child GPs
-        self.left = LGRTN(self.dx, self.dy, **self.opt,
-                          kerns=copy.deepcopy(self.kernels))
+        self.left = LGRTN(self.dx, self.dy, kerns=copy.deepcopy(self.kernels),
+                        parent=self, **self.opt)
         # kernels=self.kernels)
-        self.right = LGRTN(self.dx, self.dy, **self.opt,
-                           kerns=copy.deepcopy(self.kernels))
+        self.right = LGRTN(self.dx, self.dy, kerns=copy.deepcopy(self.kernels),
+                           parent=self, **self.opt)
         # kernels=self.kernels)
 
         # Pass data
@@ -354,7 +363,7 @@ class LGRTN(BTN):
         mus, s2s, etas = [], [], []
         nte = xt.shape[0]
 
-        self.predict_local(xt, mus, s2s, etas, np.zeros(nte))
+        mus, s2s, etas = self.predict_local(xt, np.zeros(nte))
 
         # Combine predicted values based on inference method
         if self.opt['inf_method'] != 'moe':
@@ -368,7 +377,7 @@ class LGRTN(BTN):
         s2 -= mu ** 2
         return mu, s2
 
-    def predict_local(self, xt, mu, s2, eta, log_p):
+    def predict_local(self, xt, log_p):
         """
         Local prediction function
 
@@ -389,6 +398,7 @@ class LGRTN(BTN):
             log probability to reach the leaf
 
         """
+        mu, s2, eta = [], [], []
         if self.is_leaf:
             idx = np.invert(np.isinf(log_p))
             m, v = self._compute_mus2(xt[idx, :])
@@ -405,11 +415,31 @@ class LGRTN(BTN):
             log_pl, log_pr = np.log(mpl) + log_p, np.log(mpr) + log_p
             np.seterr(divide='warn')
 
+
+
             # if nonzero probabilities exist, pass on to children
-            if np.any(log_pl > -np.inf):
-                self.left.predict_local(xt, mu, s2, eta, log_pl)
-            if np.any(log_pr > -np.inf):
-                self.right.predict_local(xt, mu, s2, eta, log_pr)
+            if mp.cpu_count() > 1 \
+                    and self.is_root and self.opt['multi_processing']:
+                tasks = []
+                if np.any(log_pl > -np.inf):
+                    tasks.append((self.left.predict_local,(xt, log_pl)))
+                if np.any(log_pr > -np.inf):
+                    tasks.append((self.right.predict_local,(xt, log_pr)))
+                if len(tasks) > 0:
+                    with mp.Pool(2) as pool:
+                        res = pool.map(wrapper, tasks, 1)
+                    for r in res:
+                        mu.extend(r[0]), s2.extend(r[1]), eta.extend(r[2])
+            else:
+                if np.any(log_pl > -np.inf):
+                    lmu, ls2, leta = self.left.predict_local(xt, log_pl)
+                    mu.extend(lmu), s2.extend(ls2), eta.extend(leta)
+                if np.any(log_pr > -np.inf):
+                    rmu, rs2, reta = self.right.predict_local(xt, log_pr)
+                    mu.extend(rmu), s2.extend(rs2), eta.extend(reta)
+
+        return mu, s2, eta
+
 
     def _setup_gps(self):
         """
