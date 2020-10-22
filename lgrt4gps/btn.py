@@ -1,5 +1,6 @@
 import binarytree
 
+
 class BTN(binarytree.Node):
     """
     Binary Tree Node inherits from Node in package binarytree
@@ -14,8 +15,9 @@ class BTN(binarytree.Node):
         string to describe the node
 
     """
-    def __init__(self, left=None, right=None, parent=None):
-        super().__init__(value=0, left=left, right=right)
+
+    def __init__(self, parent=None, value=0, **kwargs):
+        super().__init__(value=value, **kwargs)
         self.parent = parent
         self.str = id(self)
 
@@ -31,7 +33,7 @@ class BTN(binarytree.Node):
         return self._parent
 
     @parent.setter
-    def parent(self,node):
+    def parent(self, node):
         """
         Parent for current node
 
@@ -40,10 +42,7 @@ class BTN(binarytree.Node):
         node : BTN
             node to be set as parent
         """
-        if node is not None and not isinstance(node, BTN):
-            raise TypeError('node must be a BTN instance')
-        else:
-            self._parent = node
+        self._parent = node
 
     @property
     def is_leaf(self):
@@ -81,6 +80,30 @@ class BTN(binarytree.Node):
             root = root.parent
         return root
 
+    def check_parent_child(self):
+        """
+        Checks if all parent relations are set
+
+        Returns
+        -------
+        correct : bool
+            True if relations of all subtrees are correct
+            False if there is a missing link
+        """
+        if self.is_leaf:
+            return True
+        left_correct, right_correct = True, True
+        if self.left is not None:
+            if self.left.parent != self:
+                left_correct = False
+            else:
+                left_correct = self.left.check_parent_child()
+        if self.right is not None:
+            if self.right.parent != self:
+                right_correct = False
+            else:
+                right_correct = self.right.check_parent_child()
+        return left_correct and right_correct
 
     def __setattr__(self, attr, obj):
         """Modified version of ``__setattr__`` to allow arbitrary values
@@ -88,11 +111,14 @@ class BTN(binarytree.Node):
         """
         if attr == 'left':
             if obj is not None and not isinstance(obj, binarytree.Node):
-                raise binarytree.exceptions.NodeTypeError('left child must be a Node instance')
+                raise binarytree.exceptions.NodeTypeError(
+                    'left child must be a Node instance')
         elif attr == 'right':
             if obj is not None and not isinstance(obj, binarytree.Node):
-                raise binarytree.exceptions.NodeTypeError('right child must be a Node instance')
+                raise binarytree.exceptions.NodeTypeError(
+                    'right child must be a Node instance')
         elif attr == 'parent':
             if obj is not None and not isinstance(obj, binarytree.Node):
-                raise binarytree.exceptions.NodeTypeError('parent must be a Node instance')
+                raise binarytree.exceptions.NodeTypeError(
+                    'parent must be a Node instance')
         object.__setattr__(self, attr, obj)

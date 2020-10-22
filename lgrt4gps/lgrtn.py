@@ -39,25 +39,30 @@ class LGRTN(BTN):
         Turn hyperparameter optimization on or off
     lazy_training : bool
         Wait with training until prediction is called
+    multi_processing : bool
+        enables parrallel processing (for 1e5 datapoints overhead is to big)
      """
 
-    def __init__(self, dx, dy, kerns=(), parent=None,**kwargs):
+    def __init__(self, dx, dy, kerns=(), GP_engine='', div_method='center',
+                 wo_ratio=100, max_pts=100, inf_method='moe',
+                 optimize_hyps=False, lazy_training=False,
+                 multi_processing = False, **kwargs):
         """
         Locally Growing Random Tree Node
 
         """
-        super().__init__(parent=parent)
+        super().__init__(**kwargs)
         self.dx, self.dy = dx, dy
-        options = kwargs
-        options.setdefault('GP_engine', '')
-        options.setdefault('div_method', 'center')
-        options.setdefault('wo_ratio', 100)
-        options.setdefault('max_pts', 100)
-        options.setdefault('inf_method', 'moe')
-        options.setdefault('optimize_hyps', False)
-        options.setdefault('lazy_training', False)
-        options.setdefault('multi_processing', False)
-        self.opt = options
+        self.opt = {
+            'GP_engine': GP_engine,
+            'div_method': div_method,
+            'wo_ratio': wo_ratio,
+            'max_pts' :max_pts ,
+            'inf_method':inf_method,
+            'optimize_hyps':optimize_hyps,
+            'lazy_training': lazy_training,
+            'multi_processing': multi_processing
+        }
 
         # Load correct GP engine and corresponding kernel classes
         if self.opt['GP_engine'] == '':
@@ -79,7 +84,7 @@ class LGRTN(BTN):
                 [self._kernel_class(input_dim=dx) for _ in range(dy)])
         else:
             assert self.dy == len(kerns)
-            self._kernels = tuple(kerns)
+            self._kernels = copy.deepcopy(kerns)
             for k in self._kernels:
                 if not isinstance(k, self._kernel_class):
                     raise TypeError
@@ -246,10 +251,10 @@ class LGRTN(BTN):
         self.div_dim, self.div_val, self.ol = self._get_divider(X)
 
         # create empty child GPs
-        self.left = LGRTN(self.dx, self.dy, kerns=copy.deepcopy(self.kernels),
+        self.left = LGRTN(self.dx, self.dy, kerns=self.kernels,
                         parent=self, **self.opt)
         # kernels=self.kernels)
-        self.right = LGRTN(self.dx, self.dy, kerns=copy.deepcopy(self.kernels),
+        self.right = LGRTN(self.dx, self.dy, kerns=self.kernels,
                            parent=self, **self.opt)
         # kernels=self.kernels)
 
