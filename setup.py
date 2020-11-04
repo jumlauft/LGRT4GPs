@@ -41,7 +41,7 @@ setup(
                       "matplotlib"],
     entry_points={
         "console_scripts": [
-            "realpython=tests.test_lgrt:main",
+            "lgrt4gps_demo=demo.demo_1D:main",
         ]
     },
 )
