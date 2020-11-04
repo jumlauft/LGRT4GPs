@@ -26,7 +26,7 @@ def test_init():
     from lgrt4gps.kern import RBF
     try:
         LGRTN(1, 2, kerns=[RBF(input_dim=1)])
-    except AssertionError:
+    except ValueError:
         pass
 
     # Missmatch of kernel class with GP engine
