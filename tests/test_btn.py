@@ -11,7 +11,7 @@ def test_init():
     assert root.check_parent_child() == False
 
     try:
-        root.right.parent = 2
+        root.right.parent = 'Not a BTN instance'
         raise AssertionError
     except binarytree.exceptions.NodeTypeError:
         pass
@@ -23,3 +23,6 @@ def test_init():
     assert not root.is_leaf
     assert root.left.is_leaf
     assert not root.left.is_root
+    assert root.leaf_count == 2
+    root.pprint()
+    print(root)

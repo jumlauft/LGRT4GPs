@@ -41,17 +41,22 @@ def test_add_data():
     # single node
     nte, ntr = 1, 1000
     dx, dy = 3, 2
+    np.random.seed(0)
     xtr = np.random.uniform(0, 1, size=(ntr, dx))
     ytr = np.random.uniform(0, 1, size=(ntr, dy))
 
     # Check idea of lazy training
-    LGRTN(dx, dy, GP_engine='', div_method='median').add_data(xtr, ytr)
+    root = LGRTN(dx, dy, GP_engine='', div_method='median')
+    root.add_data(xtr, ytr)
+    root.leaf_count
     LGRTN(dx, dy, GP_engine='', div_method='mean').add_data(xtr, ytr)
     LGRTN(dx, dy, GP_engine='', div_method='center').add_data(xtr, ytr)
 
     LGRTN(dx, dy, GP_engine='GPy', div_method='median').add_data(xtr, ytr)
     LGRTN(dx, dy, GP_engine='GPy', div_method='mean').add_data(xtr, ytr)
     LGRTN(dx, dy, GP_engine='GPy', div_method='center').add_data(xtr, ytr)
+
+
 
 
 def test_fit():

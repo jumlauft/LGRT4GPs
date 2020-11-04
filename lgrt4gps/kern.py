@@ -1,8 +1,12 @@
 import numpy as np
 from scipy.spatial.distance import cdist
+import warnings
 class Kernel:
     def __init__(self, input_dim):
         self.input_dim = input_dim
+    def __call__(self, *nargs):
+        warnings.warn('Kernel is non-callable super class, use RBF')
+
 
 class RBF(Kernel):
     def __init__(self, input_dim, hyps=None):

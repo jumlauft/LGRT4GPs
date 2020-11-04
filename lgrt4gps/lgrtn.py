@@ -40,7 +40,7 @@ class LGRTN(BTN):
     lazy_training : bool
         Wait with training until prediction is called
     multi_processing : bool
-        enables parrallel processing (for 1e5 datapoints overhead is to big)
+        enables parrallel processing (for 1e5 datapoints overhead is too big)
      """
 
     def __init__(self, dx, dy, kerns=(), GP_engine='', div_method='center',
@@ -161,6 +161,22 @@ class LGRTN(BTN):
     @Y.setter
     def Y(self, y):
         Exception("Y may only be modified by add_data")
+    def get_child_xy(self):
+        """
+        Recursively gathers training data from all leaves
+
+        Returns
+        -------
+        childX : numpy array (ntr x dx)
+            Input training data concatenated from all children
+        childY : numpy array (ntr x dy)
+            Output training data concatenated from all children
+        """
+        if self.is_leaf:
+            return self.X, self.Y
+        leftX, leftY = self.left.get_child_xy()
+        rightX, rightY = self.right.get_child_xy()
+        return np.vstack((leftX,rightX)), np.vstack((leftY,rightY))
 
     def add_data(self, x, y):
         """
@@ -199,7 +215,7 @@ class LGRTN(BTN):
                     self._update_gp = True
                 else:
                     self._setup_gps()
-                self.val = 'N=' + str(self.X.shape[0])
+                self.str = 'N=' + str(self.X.shape[0])
 
     @property
     def is_full(self):
@@ -295,8 +311,8 @@ class LGRTN(BTN):
         prob_left: numpy array (n,)
             probabilities for left child
         """
-        return np.clip(0.5 + (x[:, self.div_dim] - self.div_val) / self.ol, 0,
-                       1)
+        return np.clip(0.5 + (self.div_val - x[:, self.div_dim]) / self.ol,
+                        0, 1)
 
     def _get_divider(self, x):
         """
@@ -328,18 +344,17 @@ class LGRTN(BTN):
             val = np.median(x[:, dim])
         elif self.opt['div_method'] == 'mean':
             val = np.mean(x[:, dim])
-        else:
+        elif self.opt['div_method'] == 'center':
             val = (ma[dim] + mi[dim]) / 2
-            if self.opt['div_method'] != 'center':
-                warnings.warn(
-                    "Division method unknown, used 'center' by default")
+        else:
+            raise NotImplemented
 
         if width[dim] == 0:
             warnings.warn("Split along a dimension of width 0, set o = 0.1")
             o = 0.1
         else:
             o = (ma[dim] - mi[dim]) / self.opt['wo_ratio']
-        self.val = 'x_' + str(dim) + '<' + '{:f}'.format(val)
+        self.str = 'x_' + str(dim) + '<' + '{:f}'.format(val)
         return dim, val, o
 
     def predict(self, xt):
@@ -371,15 +386,23 @@ class LGRTN(BTN):
         mus, s2s, etas = self.predict_local(xt, np.zeros(nte))
 
         # Combine predicted values based on inference method
-        if self.opt['inf_method'] != 'moe':
-            warnings.warn("inference method unknown, used 'moe' as default")
         mu, s2 = np.zeros((nte, self.dy)), np.zeros((nte, self.dy))
-        for (m, s, e) in zip(mus, s2s, etas):
-            idx = np.invert(np.isinf(e))
-            w = np.exp(e[idx].reshape(-1, 1))
-            mu[idx, :] += m * w
-            s2[idx, :] += w * (s + m ** 2)
-        s2 -= mu ** 2
+
+        if self.opt['inf_method'] == 'moe':
+            for (m, s, e) in zip(mus, s2s, etas):
+                idx = np.invert(np.isinf(e))
+                w = np.exp(e[idx].reshape(-1, 1))
+                mu[idx, :] += m * w
+                s2[idx, :] += w * (s + m ** 2)
+            s2 -= mu ** 2
+        elif self.opt['inf_method'] == 'simple':
+            for (m, s, e) in zip(mus, s2s, etas):
+                idx = np.invert(np.isinf(e))
+                w = np.exp(e[idx].reshape(-1, 1))
+                mu[idx, :] += m * w
+                s2[idx, :] += w * s
+        else:
+            raise NotImplementedError
         return mu, s2
 
     def predict_local(self, xt, log_p):
