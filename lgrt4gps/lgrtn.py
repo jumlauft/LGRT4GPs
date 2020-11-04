@@ -83,7 +83,8 @@ class LGRTN(BTN):
             self._kernels = tuple(
                 [self._kernel_class(input_dim=dx) for _ in range(dy)])
         else:
-            assert self.dy == len(kerns)
+            if self.dy != len(kerns):
+                raise ValueError('incorrect number of kernels')
             self._kernels = copy.deepcopy(kerns)
             for k in self._kernels:
                 if not isinstance(k, self._kernel_class):
@@ -194,11 +195,9 @@ class LGRTN(BTN):
         y : numpy array (n x dx)
             output data to be added
         """
-        assert x.ndim == 2
-        assert y.ndim == 2
-        assert x.shape[1] == self.dx
-        assert y.shape[1] == self.dy
-        assert x.shape[0] == y.shape[0]
+        if x.ndim != 2 or y.ndim != 2 or x.shape[1] != self.dx or \
+                y.shape[1] != self.dy or x.shape[0] != y.shape[0]:
+            raise ValueError('incorrect input dimensions')
 
         self.value += x.shape[0]
         if x.size > 0:
@@ -376,8 +375,8 @@ class LGRTN(BTN):
         s2 : numpy array (n x dy)
             posterior variance
         """
-        assert xt.ndim == 2
-        assert xt.shape[1] == self.dx
+        if xt.ndim != 2 or xt.shape[1] != self.dx:
+            raise ValueError('Incorrect input dimension')
 
         # Recursively get predictions from all leaves
         mus, s2s, etas = [], [], []
