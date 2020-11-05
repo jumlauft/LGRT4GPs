@@ -19,7 +19,7 @@ class RBF(Kernel):
         if len(nargs) == 2:
             xa, xb = nargs
             return self.hyps[0] ** 2 *\
-                       (np.exp(-0.5 * (cdist(xa, xb)) / self.hyps[1] ** 2))
+                       (np.exp(-0.5 * (cdist(xa, xb)**2) / self.hyps[1] ** 2))
         elif len(nargs) == 1:
             x = nargs[0]
             return self.hyps[0] ** 2 * np.ones(x.shape[0])

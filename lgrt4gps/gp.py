@@ -26,7 +26,7 @@ class GP:
 
 
     def predict(self, Xt):
-        if Xt.ndim == 2 != 2 or Xt.shape[1] != self.dx:
+        if Xt.ndim != 2 or Xt.shape[1] != self.dx:
             raise ValueError('dimension mismatch')
 
         if self.X.shape[0] > 0:
