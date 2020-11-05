@@ -1,6 +1,6 @@
 import numpy as np
 import warnings
-from LGRT4GPs.lgrt4gps.btn import BTN
+from lgrt4gps.btn import BTN
 import copy
 import multiprocessing as mp
 
@@ -66,9 +66,9 @@ class LGRTN(BTN):
 
         # Load correct GP engine and corresponding kernel classes
         if self.opt['GP_engine'] == '':
-            from LGRT4GPs.lgrt4gps.gp import GP
+            from lgrt4gps.gp import GP
             self._gp_class = GP
-            from LGRT4GPs.lgrt4gps.kern import RBF
+            from lgrt4gps.kern import RBF
             self._kernel_class = RBF
         elif self.opt['GP_engine'] == 'GPy':
             from GPy.models import GPRegression
