@@ -4,7 +4,7 @@ from lgrt4gps.lgrtn import LGRTN
 
 
 def main():
-    # set input / output dimnesions
+    # set input / output dimensions
     dx, dy = 1, 1
 
     # number of training /test  points

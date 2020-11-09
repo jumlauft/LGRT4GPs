@@ -3,11 +3,16 @@ import warnings
 from lgrt4gps.btn import BTN
 import copy
 import multiprocessing as mp
+from sklearn.gaussian_process import GaussianProcessRegressor as GP
+from sklearn.gaussian_process.kernels import Kernel, RBF, WhiteKernel, ConstantKernel
 
 
 def wrapper(input):
     fun, args = input
     return fun(*args)
+
+def dummy_optimizer(obj_func, initial_theta, bounds):
+    return initial_theta, 0
 
 class LGRTN(BTN):
     """
@@ -43,7 +48,7 @@ class LGRTN(BTN):
         enables parrallel processing (for 1e5 datapoints overhead is too big)
      """
 
-    def __init__(self, dx, dy, kerns=(), GP_engine='', div_method='center',
+    def __init__(self, dx, dy, kerns=(), GP_engine='sklearn', div_method='center',
                  wo_ratio=100, max_pts=100, inf_method='moe',
                  optimize_hyps=False, lazy_training=False,
                  multi_processing = False, **kwargs):
@@ -65,32 +70,26 @@ class LGRTN(BTN):
         }
 
         # Load correct GP engine and corresponding kernel classes
-        if self.opt['GP_engine'] == '':
-            from lgrt4gps.gp import GP
+        if self.opt['GP_engine'] == 'sklearn':
             self._gp_class = GP
-            from lgrt4gps.kern import RBF
-            self._kernel_class = RBF
-        elif self.opt['GP_engine'] == 'GPy':
-            from GPy.models import GPRegression
-            self._gp_class = GPRegression
-            from GPy.kern import RBF
-            self._kernel_class = RBF
+            self._kernel_class = Kernel
         else:
             raise NotImplementedError
 
         # Generate default kernels or check provided kernels
         if len(kerns) == 0:
+            k = ConstantKernel(1.0) * RBF((1.0,)*self.dx) + WhiteKernel(0.01)
             self._kernels = tuple(
-                [self._kernel_class(input_dim=dx) for _ in range(dy)])
+                [copy.deepcopy(k) for _ in range(dy)])
         else:
             if self.dy != len(kerns):
                 raise ValueError('incorrect number of kernels')
-            self._kernels = copy.deepcopy(kerns)
-            for k in self._kernels:
-                if not isinstance(k, self._kernel_class):
+            for k in kerns:
+                if not isinstance(k, Kernel):
                     raise TypeError
-                if k.input_dim != self.dx:
-                    raise ValueError
+            self._kernels = copy.deepcopy(kerns)
+
+
 
         # Training data
         self._X = np.empty((0, self.dx))
@@ -227,7 +226,7 @@ class LGRTN(BTN):
         """
         return self.X.shape[0] >= self.opt['max_pts']
 
-    def fit(self):
+    def fit(self, optimize_hyps=None):
         """
         Prepares the model for prediction
 
@@ -236,14 +235,10 @@ class LGRTN(BTN):
 
         """
         if self.is_leaf:
-            if self._update_gp == True:
-                self._setup_gps()
-            if self.opt['optimize_hyps']:
-                for gp in self.gps:
-                    gp.optimize()
+            self._setup_gps(optimize_hyps=optimize_hyps)
         else:
-            self.left.fit()
-            self.right.fit()
+            self.left.fit(optimize_hyps=optimize_hyps)
+            self.right.fit(optimize_hyps=optimize_hyps)
 
     def _divide(self, x, y):
         """
@@ -442,41 +437,29 @@ class LGRTN(BTN):
             log_pl, log_pr = np.log(mpl) + log_p, np.log(mpr) + log_p
             np.seterr(divide='warn')
 
-
-
             # if nonzero probabilities exist, pass on to children
-            if mp.cpu_count() > 1 \
-                    and self.is_root and self.opt['multi_processing']:
-                tasks = []
-                if np.any(log_pl > -np.inf):
-                    tasks.append((self.left.predict_local,(xt, log_pl)))
-                if np.any(log_pr > -np.inf):
-                    tasks.append((self.right.predict_local,(xt, log_pr)))
-                if len(tasks) > 0:
-                    with mp.Pool(2) as pool:
-                        res = pool.map(wrapper, tasks, 1)
-                    for r in res:
-                        mu.extend(r[0]), s2.extend(r[1]), eta.extend(r[2])
-            else:
-                if np.any(log_pl > -np.inf):
-                    lmu, ls2, leta = self.left.predict_local(xt, log_pl)
-                    mu.extend(lmu), s2.extend(ls2), eta.extend(leta)
-                if np.any(log_pr > -np.inf):
-                    rmu, rs2, reta = self.right.predict_local(xt, log_pr)
-                    mu.extend(rmu), s2.extend(rs2), eta.extend(reta)
+            if np.any(log_pl > -np.inf):
+                lmu, ls2, leta = self.left.predict_local(xt, log_pl)
+                mu.extend(lmu), s2.extend(ls2), eta.extend(leta)
+            if np.any(log_pr > -np.inf):
+                rmu, rs2, reta = self.right.predict_local(xt, log_pr)
+                mu.extend(rmu), s2.extend(rs2), eta.extend(reta)
 
         return mu, s2, eta
 
 
-    def _setup_gps(self):
+    def _setup_gps(self,optimize_hyps=None):
         """
             Prepare gp models (one for each output)
         """
+        optimize_hyps = self.opt['optimize_hyps'] if optimize_hyps==None else optimize_hyps
         self._gps = []
         for dy in range(self.dy):
-            gp = self._gp_class(self.X, self.Y[:, dy:dy + 1], self.kernels[dy])
-            if self.opt['optimize_hyps']:
-                gp.optimize(messages=False)
+            if optimize_hyps:
+                gp = self._gp_class(self.kernels[dy])
+            else:
+                gp = self._gp_class(self.kernels[dy], optimizer=dummy_optimizer)
+            gp.fit(self.X, self.Y[:, dy:dy + 1])
             self._gps.append(gp)
         self._update_gp = False
 
@@ -500,6 +483,6 @@ class LGRTN(BTN):
             self._setup_gps()
         mus, s2s = [], []
         for dy in range(self.dy):
-            mu, s2 = self.gps[dy].predict(xt)
-            mus.append(mu), s2s.append(s2)
+            mu, sig = self.gps[dy].predict(xt, return_std=True)
+            mus.append(mu), s2s.append((sig**2).reshape(-1,1))
         return np.concatenate(mus, axis=1), np.concatenate(s2s, axis=1)

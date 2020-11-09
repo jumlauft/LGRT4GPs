@@ -6,36 +6,13 @@ from lgrt4gps.lgrtn import LGRTN
 
 
 def test_init():
-    LGRTN(1, 1, GP_engine='')
-    LGRTN(1, 1, GP_engine='GPy')
+    LGRTN(1, 1)
 
     # Unavailable GP engine
     try:
         LGRTN(1, 1, GP_engine='any')
     except NotImplementedError:
         pass
-
-    # Missmatch of kernel input dimension
-    from lgrt4gps.kern import RBF
-    try:
-        LGRTN(2, 1, kerns=[RBF(input_dim=3)])
-    except ValueError:
-        pass
-
-    # Missmatch of kernel count
-    from lgrt4gps.kern import RBF
-    try:
-        LGRTN(1, 2, kerns=[RBF(input_dim=1)])
-    except ValueError:
-        pass
-
-    # Missmatch of kernel class with GP engine
-    from GPy.kern import RBF
-    try:
-        LGRTN(1, 1, kerns=[RBF(input_dim=1)])
-    except TypeError:
-        pass
-
 
 def test_add_data():
     # single node
@@ -46,15 +23,12 @@ def test_add_data():
     ytr = np.random.uniform(0, 1, size=(ntr, dy))
 
     # Check idea of lazy training
-    root = LGRTN(dx, dy, GP_engine='', div_method='median')
+    root = LGRTN(dx, dy, div_method='median')
     root.add_data(xtr, ytr)
     root.leaf_count
-    LGRTN(dx, dy, GP_engine='', div_method='mean').add_data(xtr, ytr)
-    LGRTN(dx, dy, GP_engine='', div_method='center').add_data(xtr, ytr)
+    LGRTN(dx, dy, div_method='mean').add_data(xtr, ytr)
+    LGRTN(dx, dy, div_method='center').add_data(xtr, ytr)
 
-    LGRTN(dx, dy, GP_engine='GPy', div_method='median').add_data(xtr, ytr)
-    LGRTN(dx, dy, GP_engine='GPy', div_method='mean').add_data(xtr, ytr)
-    LGRTN(dx, dy, GP_engine='GPy', div_method='center').add_data(xtr, ytr)
 
 
 
@@ -67,14 +41,14 @@ def test_fit():
     ytr = np.random.uniform(0, 1, size=(ntr, dy))
 
     # Check idea of lazy training
-    lgrtn = LGRTN(dx, dy, GP_engine='', lazy_training=True, optimize_hyps=False)
+    lgrtn = LGRTN(dx, dy, lazy_training=True, optimize_hyps=False)
     lgrtn.add_data(xtr, ytr)
     assert lgrtn._update_gp == True
     lgrtn.fit()
     assert lgrtn._update_gp == False
 
     # Verify failure of hyp optimizer for simple
-    lgrtn = LGRTN(dx, dy, GP_engine='', lazy_training=True, optimize_hyps=True)
+    lgrtn = LGRTN(dx, dy, lazy_training=True, optimize_hyps=True)
     lgrtn.add_data(xtr, ytr)
     try:
         lgrtn.fit()
@@ -82,28 +56,28 @@ def test_fit():
         pass
 
     # Verfiy hyps are not updated if not wanted
-    lgrtn = LGRTN(dx, dy, GP_engine='GPy', lazy_training=True,
-                  optimize_hyps=False)
+    lgrtn = LGRTN(dx, dy, lazy_training=False, optimize_hyps=False)
     lgrtn.add_data(xtr, ytr)
-    hyps = [lgrtn.kernels[0].parameters[0].values[0],
-            lgrtn.kernels[0].parameters[1].values[0]]
+    hyps = (lgrtn._gps[0].kernel_.get_params()['k1__k1__constant_value'],
+            lgrtn._gps[0].kernel_.get_params()['k1__k2__length_scale'],
+            lgrtn._gps[0].kernel_.get_params()['k2__noise_level'])
     lgrtn.fit()
-    new_hyps = [lgrtn.kernels[0].parameters[0].values[0],
-                lgrtn.kernels[0].parameters[1].values[0]]
-    assert hyps[0] == new_hyps[0]
-    assert hyps[1] == new_hyps[1]
+    new_hyps = (lgrtn._gps[0].kernel_.get_params()['k1__k1__constant_value'],
+            lgrtn._gps[0].kernel_.get_params()['k1__k2__length_scale'],
+            lgrtn._gps[0].kernel_.get_params()['k2__noise_level'])
+    assert all([o == n for o,n in zip(hyps, new_hyps)])
 
     # Verfiy hyps are updated if  wanted
-    lgrtn = LGRTN(dx, dy, GP_engine='GPy', lazy_training=True,
-                  optimize_hyps=True)
+    lgrtn = LGRTN(dx, dy, lazy_training=False, optimize_hyps=False)
     lgrtn.add_data(xtr, ytr)
-    hyps = [lgrtn.kernels[0].parameters[0].values[0],
-            lgrtn.kernels[0].parameters[1].values[0]]
-    lgrtn.fit()
-    new_hyps = [lgrtn.kernels[0].parameters[0].values[0],
-                lgrtn.kernels[0].parameters[1].values[0]]
-    assert hyps[0] != new_hyps[0]
-    assert hyps[1] != new_hyps[1]
+    hyps = (lgrtn._gps[0].kernel_.get_params()['k1__k1__constant_value'],
+            lgrtn._gps[0].kernel_.get_params()['k1__k2__length_scale'],
+            lgrtn._gps[0].kernel_.get_params()['k2__noise_level'])
+    lgrtn.fit(optimize_hyps=True)
+    new_hyps = (lgrtn._gps[0].kernel_.get_params()['k1__k1__constant_value'],
+                lgrtn._gps[0].kernel_.get_params()['k1__k2__length_scale'],
+                lgrtn._gps[0].kernel_.get_params()['k2__noise_level'])
+    assert all([o != n for o, n in zip(hyps, new_hyps)])
 
 
 def test_predict():
@@ -115,11 +89,11 @@ def test_predict():
     xte = np.random.uniform(0, 1, size=(nte, dx))
     yte = xte ** 2
 
-    lgrtn = LGRTN(dx, dy, GP_engine='', inf_method='moe')
+    lgrtn = LGRTN(dx, dy, inf_method='moe')
     lgrtn.add_data(xtr, ytr)
     mute1, _ = lgrtn.predict(xte)
 
-    lgrtn = LGRTN(dx, dy, GP_engine='GPy', inf_method='moe')
+    lgrtn = LGRTN(dx, dy, inf_method='moe')
     lgrtn.add_data(xtr, ytr)
     mute2, _ = lgrtn.predict(xte)
 
