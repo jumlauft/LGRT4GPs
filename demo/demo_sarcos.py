@@ -38,14 +38,14 @@ def main():
     results = []
 
     ntr = xtr.shape[0]
-    for n in range(1,ntr,1000):
+    for n in range(1,ntr,10000):
         lgrt_gp = LGRTN(dx, dy)
         idx = np.random.choice(ntr, n, replace=False)
         idx1 = np.random.choice(ntr, 1, replace=False)
         t1 = time()
         lgrt_gp.add_data(xtr[idx,:], ytr[idx,:])
         t2 = time()
-        mu, s2 = lgrt_gp.predict(xte)
+        mu, sig = lgrt_gp.predict(xte, return_std=True)
         t3 = time()
         lgrt_gp.add_data(xtr[idx1, :], ytr[idx1, :])
         t4 = time()
@@ -53,7 +53,7 @@ def main():
         results.append([n, t2-t1, (t3-t2)/xte.shape[0], t4-t3,
                             lgrt_gp.height, lgrt_gp.leaf_count,
                             np.mean((mu - yte) ** 2),
-                            -np.sum(norm.logpdf(yte,loc=mu, scale=np.sqrt(s2))) ])
+                            -np.sum(norm.logpdf(yte,loc=mu, scale=sig)) ])
 
         df = pd.DataFrame(results, columns=labels)
         df.to_csv('results_sarcos.csv')
@@ -76,6 +76,7 @@ def main():
         ax = plt.plot(df['N'],df[c])
         plt.xlabel('N')
         plt.ylabel(yl)
+    plt.show()
 
 if __name__ == '__main__':
     main()

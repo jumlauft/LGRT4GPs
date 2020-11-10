@@ -8,8 +8,9 @@ from sklearn.gaussian_process.kernels import RBF, WhiteKernel, ConstantKernel
 
 
 def test_init():
-    LGRTN(1, 1)
-
+    dx, dy = 2, 1
+    LGRTN(dx, dy)
+    LGRTN(dx, dy, bounds=((-4.0,6.0),)*dx)
     # Unavailable GP engine
     try:
         LGRTN(1, 1, GP_engine='any')
@@ -25,11 +26,14 @@ def test_add_data():
     ytr = np.random.uniform(0, 1, size=(ntr, dy))
 
     # Check idea of lazy training
-    root = LGRTN(dx, dy, div_method='median')
-    root.add_data(xtr, ytr)
-    root.leaf_count
+    LGRTN(dx, dy, div_method='median').add_data(xtr, ytr)
     LGRTN(dx, dy, div_method='mean').add_data(xtr, ytr)
     LGRTN(dx, dy, div_method='center').add_data(xtr, ytr)
+    root = LGRTN(dx, dy, bounds=((-4.0,6.0),)*dx)
+    root.add_data(xtr,ytr)
+    print(root)
+    print('Number of leaves: ' + str(root.leaf_count))
+
 
 
 
@@ -111,5 +115,5 @@ def test_predict():
     lgrtn.add_data(xtr, ytr)
     mute, sigte = lgrtn.predict(xte, return_std=True)
     assert np.mean((muteGP - mute) ** 2) < 1e-4
-    assert np.mean((sigteGP.reshape(-1,1)  - sigte) ** 2) < 1e-4
+    assert np.mean((sigteGP.reshape(-1,1) - sigte) ** 2) < 1e-4
 

@@ -5,14 +5,12 @@ import copy
 import multiprocessing as mp
 from sklearn.gaussian_process import GaussianProcessRegressor as GP
 from sklearn.gaussian_process.kernels import Kernel, RBF, WhiteKernel, ConstantKernel
-
+from sklearn.preprocessing import MinMaxScaler
 
 def wrapper(input):
     fun, args = input
     return fun(*args)
 
-def dummy_optimizer(obj_func, initial_theta, bounds):
-    return initial_theta, 0
 
 class LGRTN(BTN):
     """
@@ -50,21 +48,39 @@ class LGRTN(BTN):
 
     def __init__(self, dx, dy, kerns=(), GP_engine='sklearn', div_method='center',
                  wo_ratio=100, max_pts=100, inf_method='moe',
-                 optimize_hyps=False, lazy_training=False,
-                 multi_processing = False, **kwargs):
+                 optimize_hyps=False, lazy_training=False, sct=None,
+                 multi_processing = False, bounds=None, **kwargs ):
         """
         Locally Growing Random Tree Node
 
         """
         super().__init__(**kwargs)
+        if bounds is None:
+            self.bounds = ((-np.inf, np.inf),)*dx
+        else:
+            self.bounds = bounds
+
+        if self.is_root:
+            if sct is not None:
+                ValueError('Root cannot be given a transform sct')
+            # Setup scaler if there is no if in bounds
+            if any([(np.inf in b) or (-np.inf in b) for b in self.bounds]):
+                self.sct = lambda x: x
+            else:
+                scaler = MinMaxScaler()
+                scaler.fit(tuple(map(tuple, zip(*self.bounds))))
+                self.sct = lambda x: scaler.transform(x.reshape(-1, dx))
+        else:
+            self.sct = sct
+
         self.dx, self.dy = dx, dy
         self.opt = {
             'GP_engine': GP_engine,
             'div_method': div_method,
             'wo_ratio': wo_ratio,
-            'max_pts' :max_pts ,
-            'inf_method':inf_method,
-            'optimize_hyps':optimize_hyps,
+            'max_pts' : max_pts ,
+            'inf_method': inf_method,
+            'optimize_hyps': optimize_hyps,
             'lazy_training': lazy_training,
             'multi_processing': multi_processing
         }
@@ -259,17 +275,28 @@ class LGRTN(BTN):
 
         # determine cutting dimension
         self.div_dim, self.div_val, self.ol = self._get_divider(X)
+        boundsl = [list(b) for b in self.bounds]
+        boundsr = [list(b) for b in self.bounds]
+
+        boundsl[self.div_dim][1] = self.div_val + self.ol
+        boundsr[self.div_dim][0] = self.div_val - self.ol
 
         # create empty child GPs
-        self.left = LGRTN(self.dx, self.dy, kerns=self.kernels,
-                        parent=self, **self.opt)
-        # kernels=self.kernels)
-        self.right = LGRTN(self.dx, self.dy, kerns=self.kernels,
-                           parent=self, **self.opt)
-        # kernels=self.kernels)
+        self.left = self.__class__(self.dx, self.dy, kerns=self.kernels,
+                                   parent=self, sct=self.sct,
+                                   bounds=boundsl, **self.opt)
+
+        self.right = self.__class__(self.dx, self.dy, kerns=self.kernels,
+                                    parent=self, sct=self.sct,
+                                    bounds=boundsr, **self.opt)
 
         # Pass data
         self._distribute_data(X, Y)
+        if (self.left.X.shape[0] == 0 and self.left.is_leaf) or \
+                (self.right.X.shape[0] == 0 and self.right.is_leaf):
+            warnings.warn('one leaf has not data')
+        if not self.left.data_in_range or not self.right.data_in_range:
+            warnings.warn('Data not in range')
 
         # empty parent GP
         self._X, self._Y = np.empty((0, self.dx)), np.empty((0, self.dy))
@@ -307,6 +334,10 @@ class LGRTN(BTN):
         """
         return np.clip(0.5 + (self.div_val - x[:, self.div_dim]) / self.ol,
                         0, 1)
+    @property
+    def data_in_range(self):
+        return np.all(self.X > [b[0] for b in self.bounds]) and \
+               np.all(self.X < [b[1] for b in self.bounds])
 
     def _get_divider(self, x):
         """
@@ -456,8 +487,8 @@ class LGRTN(BTN):
             if optimize_hyps:
                 gp = self._gp_class(self.kernels[dy])
             else:
-                gp = self._gp_class(self.kernels[dy], optimizer=dummy_optimizer)
-            gp.fit(self.X, self.Y[:, dy:dy + 1])
+                gp = self._gp_class(self.kernels[dy], optimizer=None)
+            gp.fit(self.sct(self.X), self.Y[:, dy:dy + 1])
             self._gps.append(gp)
         self._update_gp = False
 
@@ -482,11 +513,11 @@ class LGRTN(BTN):
         if self._update_gp:
             self._setup_gps()
         mus, sigs = [], []
-        for dy in range(self.dy):
+        for gp in self.gps:
             if return_std:
-                mu, sig = self.gps[dy].predict(xt, return_std=True)
+                mu, sig = gp.predict(self.sct(xt), return_std=True)
             else:
-                mu = self.gps[dy].predict(xt, return_std=False)
+                mu = gp.predict(self.sct(xt), return_std=False)
                 sig = np.zeros_like(mu)
             mus.append(mu), sigs.append(sig.reshape(-1,1))
         return np.concatenate(mus, axis=1), np.concatenate(sigs, axis=1)
