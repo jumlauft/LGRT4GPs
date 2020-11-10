@@ -11,7 +11,6 @@ def wrapper(input):
     fun, args = input
     return fun(*args)
 
-
 class LGRTN(BTN):
     """
     Locally Growing Random Tree Node inherits from BTN
