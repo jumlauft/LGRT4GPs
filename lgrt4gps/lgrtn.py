@@ -11,9 +11,6 @@ def wrapper(input):
     fun, args = input
     return fun(*args)
 
-def dummy_optimizer(obj_func, initial_theta, bounds):
-    return initial_theta, 0
-
 class LGRTN(BTN):
     """
     Locally Growing Random Tree Node inherits from BTN
@@ -456,7 +453,7 @@ class LGRTN(BTN):
             if optimize_hyps:
                 gp = self._gp_class(self.kernels[dy])
             else:
-                gp = self._gp_class(self.kernels[dy], optimizer=dummy_optimizer)
+                gp = self._gp_class(self.kernels[dy], optimizer=None)
             gp.fit(self.X, self.Y[:, dy:dy + 1])
             self._gps.append(gp)
         self._update_gp = False
