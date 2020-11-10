@@ -3,6 +3,8 @@ import sys, os
 
 sys.path.append(os.path.abspath('./'))
 from lgrt4gps.lgrtn import LGRTN
+from sklearn.gaussian_process import GaussianProcessRegressor as GP
+from sklearn.gaussian_process.kernels import RBF, WhiteKernel, ConstantKernel
 
 
 def test_init():
@@ -82,20 +84,32 @@ def test_fit():
 
 def test_predict():
     np.random.seed(0)
-    nte, ntr = 100, 10000
-    dx, dy = 2, 2
+    nte, ntr = 100, 1000
+    dx, dy = 2, 1
     xtr = np.random.uniform(0, 1, size=(ntr, dx))
-    ytr = xtr ** 2
+    ytr = np.sum(xtr ** 2, axis=1).reshape(-1,1)
     xte = np.random.uniform(0, 1, size=(nte, dx))
-    yte = xte ** 2
+    yte = np.sum(xte ** 2, axis=1).reshape(-1,1)
 
-    lgrtn = LGRTN(dx, dy, inf_method='moe')
+    gpr = GP(kernel=ConstantKernel(1.0) * RBF((1.0,)*dx) + WhiteKernel(0.01),
+             optimizer=None)
+    gpr.fit(xtr, ytr)
+    muteGP, sigteGP = gpr.predict(xte, return_std=True)
+
+    lgrtn = LGRTN(dx, dy, inf_method='moe', max_pts=ntr)
     lgrtn.add_data(xtr, ytr)
-    mute1, _ = lgrtn.predict(xte)
 
-    lgrtn = LGRTN(dx, dy, inf_method='moe')
+    mute = lgrtn.predict(xte)
+    assert np.mean((muteGP - mute) ** 2) < 1e-10
+
+    mute, sigte = lgrtn.predict(xte, return_std=True)
+
+    assert np.mean((muteGP - mute) ** 2) < 1e-10
+    assert np.mean((sigteGP.reshape(-1,1) - sigte) ** 2) < 1e-10
+
+    lgrtn = LGRTN(dx, dy, inf_method='moe', max_pts=100)
     lgrtn.add_data(xtr, ytr)
-    mute2, _ = lgrtn.predict(xte)
+    mute, sigte = lgrtn.predict(xte, return_std=True)
+    assert np.mean((muteGP - mute) ** 2) < 1e-4
+    assert np.mean((sigteGP.reshape(-1,1)  - sigte) ** 2) < 1e-4
 
-    assert np.mean((yte - mute1) ** 2) < 0.01
-    assert np.mean((yte - mute2) ** 2) < 0.01

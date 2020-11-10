@@ -351,9 +351,9 @@ class LGRTN(BTN):
         self.str = 'x_' + str(dim) + '<' + '{:f}'.format(val)
         return dim, val, o
 
-    def predict(self, xt):
+    def predict(self, xt, return_std=False):
         """
-        Predicts posterior mean and variance based on all leaf GPs
+        Predicts posterior mean and standard deviation based on all leaf GPs
 
         Starts the recursive call to  prediction functions of leaves
         and combines the predictions according to the chosen inference method
@@ -362,44 +362,47 @@ class LGRTN(BTN):
         ----------
         xt : numpy array (n x dx)
             test inputs
-
+        return_std : bool (default: False)
+            whether std dev is computed or not
         Returns
         -------
         mu : numpy array (n x dy)
             posterior mean
-        s2 : numpy array (n x dy)
-            posterior variance
+        sig : numpy array (n x dy)
+            posterior standard deviation
         """
         if xt.ndim != 2 or xt.shape[1] != self.dx:
             raise ValueError('Incorrect input dimension')
 
         # Recursively get predictions from all leaves
-        mus, s2s, etas = [], [], []
         nte = xt.shape[0]
-
-        mus, s2s, etas = self.predict_local(xt, np.zeros(nte))
+        mus, sigs, etas = self._predict_local(xt, np.zeros(nte), return_std)
 
         # Combine predicted values based on inference method
-        mu, s2 = np.zeros((nte, self.dy)), np.zeros((nte, self.dy))
+        mu, sig = np.zeros((nte, self.dy)), np.zeros((nte, self.dy))
 
-        if self.opt['inf_method'] == 'moe':
-            for (m, s, e) in zip(mus, s2s, etas):
-                idx = np.invert(np.isinf(e))
+
+        for (m, s, e) in zip(mus, sigs, etas):
+            idx = np.invert(np.isinf(e))
+            if self.opt['inf_method'] == 'moe':
                 w = np.exp(e[idx].reshape(-1, 1))
                 mu[idx, :] += m * w
-                s2[idx, :] += w * (s + m ** 2)
-            s2 -= mu ** 2
-        elif self.opt['inf_method'] == 'simple':
-            for (m, s, e) in zip(mus, s2s, etas):
-                idx = np.invert(np.isinf(e))
+                sig[idx, :] += w * (s + m ** 2)
+            elif self.opt['inf_method'] == 'simple':
                 w = np.exp(e[idx].reshape(-1, 1))
                 mu[idx, :] += m * w
-                s2[idx, :] += w * s
+                sig[idx, :] += w * s
+            else:
+                raise NotImplementedError
+        if self.opt['inf_method'] == 'moe': sig -= mu ** 2
+
+        if return_std:
+            return mu, sig
         else:
-            raise NotImplementedError
-        return mu, s2
+            return mu
 
-    def predict_local(self, xt, log_p):
+
+    def _predict_local(self, xt, log_p, return_std):
         """
         Local prediction function
 
@@ -410,22 +413,17 @@ class LGRTN(BTN):
         ----------
         xt : numpy array (n x dx)
             input test points
-        mu : list
-            list of posterior mean predictions of leaves
-        s2 : list
-            list of posterior variance predictions of leaves
-        eta : list
-            list of log probabilities to reach the leaf
         log_p :
             log probability to reach the leaf
-
+        return_std : bool (default: False)
+            whether std dev is computed or not
         """
-        mu, s2, eta = [], [], []
+        mu, sig, eta = [], [], []
         if self.is_leaf:
             idx = np.invert(np.isinf(log_p))
-            m, v = self._compute_mus2(xt[idx, :])
+            m, v = self._compute_musig(xt[idx, :], return_std)
             mu.append(m)
-            s2.append(v)
+            sig.append(v)
             eta.append(log_p)
         else:
             # compute marginal probabilities
@@ -439,13 +437,13 @@ class LGRTN(BTN):
 
             # if nonzero probabilities exist, pass on to children
             if np.any(log_pl > -np.inf):
-                lmu, ls2, leta = self.left.predict_local(xt, log_pl)
-                mu.extend(lmu), s2.extend(ls2), eta.extend(leta)
+                lmu, lsig, leta = self.left._predict_local(xt, log_pl, return_std)
+                mu.extend(lmu), sig.extend(lsig), eta.extend(leta)
             if np.any(log_pr > -np.inf):
-                rmu, rs2, reta = self.right.predict_local(xt, log_pr)
-                mu.extend(rmu), s2.extend(rs2), eta.extend(reta)
+                rmu, rsig, reta = self.right._predict_local(xt, log_pr, return_std)
+                mu.extend(rmu), sig.extend(rsig), eta.extend(reta)
 
-        return mu, s2, eta
+        return mu, sig, eta
 
 
     def _setup_gps(self,optimize_hyps=None):
@@ -463,7 +461,7 @@ class LGRTN(BTN):
             self._gps.append(gp)
         self._update_gp = False
 
-    def _compute_mus2(self, xt):
+    def _compute_musig(self, xt, return_std):
         """
         Calls gp from GPy to make predictions
 
@@ -471,18 +469,24 @@ class LGRTN(BTN):
         ----------
         xt : numpy array (n x dx)
             test inputs
+        return_std : bool (default: False)
+            whether std dev is computed or not
 
         Returns
         -------
         mu : numpy array (n x dy)
             posterior mean
-        s2 : numpy array (n x dy)
+        sig : numpy array (n x dy)
             posterior variance
         """
         if self._update_gp:
             self._setup_gps()
-        mus, s2s = [], []
+        mus, sigs = [], []
         for dy in range(self.dy):
-            mu, sig = self.gps[dy].predict(xt, return_std=True)
-            mus.append(mu), s2s.append((sig**2).reshape(-1,1))
-        return np.concatenate(mus, axis=1), np.concatenate(s2s, axis=1)
+            if return_std:
+                mu, sig = self.gps[dy].predict(xt, return_std=True)
+            else:
+                mu = self.gps[dy].predict(xt, return_std=False)
+                sig = np.zeros_like(mu)
+            mus.append(mu), sigs.append(sig.reshape(-1,1))
+        return np.concatenate(mus, axis=1), np.concatenate(sigs, axis=1)
