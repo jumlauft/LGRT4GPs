@@ -1,14 +1,14 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from lgrt4gps.lgrtn import LGRTN
-
+from time import time
 
 def main():
     # set input / output dimensions
     dx, dy = 1, 1
 
     # number of training /test  points
-    ntr, nte = 300, 100
+    ntr, nte = 500, 100
     f = lambda x: np.sin(x[:, :1])
 
     # generate training data
@@ -20,14 +20,14 @@ def main():
     yte = f(xte)
 
     # initialize LGRT
-    lgrt_gp = LGRTN(dx, dy)
+    lgrt_gp = LGRTN(dx, dy, max_pts=1000)
 
     # add data to LGRT
     lgrt_gp.add_data(xtr,ytr)
-
+    t0 = time()
     # make predictions
-    mu, s2 = lgrt_gp.predict(xte)
-
+    mu, sig = lgrt_gp.predict(xte,return_std=True )
+    print('Prediction time: '+ str(time()-t0))
     # display tree structure
     print(lgrt_gp)
 
@@ -36,9 +36,9 @@ def main():
     plt.figure()
     plt.scatter(xtr, ytr)
     plt.plot(xte, mu,'r')
-    plt.plot(xte, mu + beta*s2,'r--')
+    plt.plot(xte, mu + beta*sig,'r--')
     plt.legend(['posterior mean',  'posterior variance', 'Training data',])
-    plt.plot(xte, mu - beta*s2, 'r--')
+    plt.plot(xte, mu - beta*sig, 'r--')
     plt.show()
 
 if __name__ == '__main__':
